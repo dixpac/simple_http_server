@@ -1,16 +1,15 @@
 require 'socket'
 
 class Request
-  attr_reader :method, :path, :headers, :body
+  attr_reader :method, :path, :headers, :query, :body
 
   def initialize(request)
     lines = request.lines
+    index = lines.index("\r\n")
 
     @method, @path, = lines.first.split
-
-    index = lines.index("\r\n")
+    @path, @query = @path.split('?')
     @headers = parse_headers(lines[1...index])
-
     @body = lines[(index - 1)..-1].join
   end
 
@@ -30,6 +29,30 @@ class Request
   end
 end
 
+class Response
+  attr_reader :code, :body
+
+  def initialize(code:, body: '')
+    @code = code
+    @body = body
+  end
+
+  def send(client)
+    client.print "HTTP/1.1 #{code}\r\n"
+    client.print "Content-Type: text/html\r\n"
+    client.print "\r\n"
+    client.print "#{body}\r\n" if body
+  end
+end
+
+def router(request)
+  if request.path == '/'
+    Response.new(code: 200, body: 'Root')
+  else
+    Response.new(code: 404)
+  end
+end
+
 port = ENV.fetch('SIMPLE_PORT', '3008').to_i
 server = TCPServer.new(port)
 
@@ -37,11 +60,9 @@ puts "Listening on port #{port}"
 loop do
   client = server.accept
   request = Request.new client.readpartial(2048)
-  p request
 
-  client.puts "HTTP/1.1 200 OK\r\n"
-  client.puts "Content-Type: text/html\r\n"
-  client.puts "\r\n"
-  client.puts "Current time is #{Time.now}\r\n"
+  response = router(request)
+  response.send(client)
+
   client.close
 end
