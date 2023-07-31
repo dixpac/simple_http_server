@@ -24,6 +24,10 @@ class Request
 
     headers
   end
+
+  def content_length
+    headers['Content-Length'].to_i
+  end
 end
 
 port = ENV.fetch('SIMPLE_PORT', '3008').to_i
